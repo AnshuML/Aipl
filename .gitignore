@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+.venv/
+venv/
+ENV/
+# Logs
+*.log
+# Streamlit
+.streamlit/
+# OS files
+.DS_Store
+Thumbs.db
+# Project runtime data
+baaten/uploads/**
+baaten/faiss_index/**
+# Local Python runtime bundle
+ajit/
+
+baaten/app.log

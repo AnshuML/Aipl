@@ -1,0 +1,7 @@
+ajit/
+__pycache__/
+*.pyc
+baaten/app.log
+baaten/uploads/**
+baaten/faiss_index/**
+.env
