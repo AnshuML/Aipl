@@ -298,7 +298,8 @@ def main():
         email = st.text_input("Enter your company email", value=st.session_state.email)
         password = st.text_input("Enter password", type="password")
         if st.button("Login"):
-            if re.match(r"^[\w\.-]+@aiplabro\.com$", email) and password == "password":
+            # Allow both aiplabro.com and ajitindustries.com company emails
+            if re.match(r"^[\w\.-]+@(aiplabro\.com|ajitindustries\.com)$", email) and password == "password":
                 st.session_state.logged_in = True
                 st.session_state.email = email
                 st.success("Logged in successfully!")
