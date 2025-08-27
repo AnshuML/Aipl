@@ -58,9 +58,30 @@ def read_email_addresses(file_path):
         return []
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+def _get_openai_api_key() -> str:
+    """Return OPENAI_API_KEY from env or Streamlit secrets.
+
+    - Prefers OS env var
+    - Fallback to st.secrets["OPENAI_API_KEY"] when running on Streamlit Cloud
+    - Trims accidental surrounding quotes
+    """
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        try:
+            # Import inside function to avoid issues in non-Streamlit contexts
+            import streamlit as _st
+            key = _st.secrets.get("OPENAI_API_KEY") if hasattr(_st, "secrets") else None
+        except Exception:
+            key = None
+    if isinstance(key, str):
+        key = key.strip().strip('"').strip("'")
+    return key or ""
+
+OPENAI_API_KEY = _get_openai_api_key()
 if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY not found in environment variables.")
+    st.error("OPENAI_API_KEY not found. Set it in environment variables or Streamlit secrets.")
+    st.stop()
 
 # Set OpenAI API key for openai module
 openai.api_key = OPENAI_API_KEY

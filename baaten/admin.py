@@ -9,10 +9,21 @@ load_dotenv()
 
 st.set_page_config(page_title="Admin - Department Data Upload", layout="wide")
 
+def _get_openai_api_key() -> str:
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        try:
+            key = st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None
+        except Exception:
+            key = None
+    if isinstance(key, str):
+        key = key.strip().strip('"').strip("'")
+    return key or ""
+
 # Try to get the API key from secrets or environment
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = _get_openai_api_key()
 if not api_key:
-    st.error("OPENAI_API_KEY not set in Streamlit secrets or .env file. Please configure it.")
+    st.error("OPENAI_API_KEY not set in environment or Streamlit secrets.")
     st.stop()
 
 openai.api_key = api_key

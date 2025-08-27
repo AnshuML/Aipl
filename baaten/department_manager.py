@@ -9,7 +9,7 @@ class DepartmentManager:
     def __init__(self):
         self.departments = {}
         load_dotenv()
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.openai_api_key = self._get_openai_api_key()
         self.embedding_model = "text-embedding-3-large"
         
         # Define base directory path
@@ -26,6 +26,20 @@ class DepartmentManager:
             model=self.embedding_model
         )
         return [d['embedding'] for d in response['data']]
+
+    def _get_openai_api_key(self) -> str:
+        key = os.getenv("OPENAI_API_KEY")
+        if not key:
+            try:
+                import streamlit as st
+                key = st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None
+            except Exception:
+                key = None
+        if not key:
+            raise ValueError("OPENAI_API_KEY not set in environment or Streamlit secrets.")
+        if isinstance(key, str):
+            key = key.strip().strip('"').strip("'")
+        return key
 
     def create_department_index(self, department_name, documents):
         embeddings = self.get_openai_embeddings(documents)
