@@ -1,0 +1,12 @@
+[
+server
+]
+fileWatcherType = "none"
+runOnSave = false
+
+[
+client
+]
+showErrorDetails = true
+
+
