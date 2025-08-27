@@ -174,7 +174,14 @@ SUGGESTIONS = {
 # --- Dynamic Greeting Function ---
 def get_greeting():
     from datetime import datetime
-    hour = datetime.now().hour
+    # Use local timezone; default to Asia/Kolkata, override with APP_TIMEZONE env
+    try:
+        local_tz_name = os.getenv("APP_TIMEZONE", "Asia/Kolkata")
+        local_tz = pytz.timezone(local_tz_name)
+        hour = datetime.now(local_tz).hour
+    except Exception:
+        # Fallback to naive local time if timezone not available
+        hour = datetime.now().hour
     if hour < 12:
         return "Good morning!"
     elif hour < 18:
