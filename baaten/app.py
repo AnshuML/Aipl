@@ -89,8 +89,7 @@ if not OPENAI_API_KEY:
     st.error("OPENAI_API_KEY not found. Set it in environment variables or Streamlit secrets.")
     st.stop()
 
-# Set OpenAI API key for openai module
-openai.api_key = OPENAI_API_KEY
+# OpenAI API key is now handled by the OpenAI client in each function
 
 
 class DocumentService:
@@ -117,7 +116,9 @@ class DocumentService:
     def get_embeddings(self, texts: list):
         """Generate embeddings using text-embedding-3-large model."""
         try:
-            response = openai.Embedding.create(
+            from openai import OpenAI
+            client = OpenAI()
+            response = client.embeddings.create(
                 input=texts,
                 model=config.EMBEDDING_MODEL
             )
@@ -129,7 +130,9 @@ class DocumentService:
     def generate_text(self, prompt: str, temperature=0.3) -> str:
         """Generate text using GPT-4 Omni (multimodel-gpt-4o)."""
         try:
-            response = openai.ChatCompletion.create(
+            from openai import OpenAI
+            client = OpenAI()
+            response = client.chat.completions.create(
                 model=config.LLM_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature
@@ -469,7 +472,17 @@ def main():
     if department == "Select...":
         st.markdown("""<div style='background: rgba(56, 189, 248, 0.1); color: #38bdf8; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #38bdf8; font-size: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'><strong>ℹ️ Info:</strong> Please select a department to ask a question.</div>""", unsafe_allow_html=True)
     else:
-        placeholder = f"Ask a question from {department}..."
+        # Check if department has documents
+        try:
+            department_manager = get_department_manager()
+            docs = department_manager.get_department_docs(department)
+            if not docs:
+                st.markdown(f"""<div style='background: rgba(251, 191, 36, 0.1); color: #fbbf24; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #fbbf24; font-size: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'><strong>⚠️ Notice:</strong> No documents found for {department} department. Please upload documents via admin panel first.</div>""", unsafe_allow_html=True)
+                placeholder = f"Ask a question from {department} (no documents uploaded yet)..."
+            else:
+                placeholder = f"Ask a question from {department}..."
+        except:
+            placeholder = f"Ask a question from {department}..."
 
     # Display chat history before the input box
     if st.session_state.query_history:
@@ -523,6 +536,20 @@ def main():
             docs = department_manager.get_department_docs(department)
             if not docs:
                 response = f"❌ No documents found for {department} department. Please upload documents via admin."
+                
+                # Calculate response time for error
+                end_time = datetime.now()
+                response_time = (end_time - start_time).total_seconds()
+                
+                # Log the response
+                user_logger.log_bot_response(
+                    email=st.session_state.email,
+                    question=user_query,
+                    response=response,
+                    success=False,
+                    response_time=response_time
+                )
+                
                 st.session_state.query_history.append((user_query, response))
                 st.session_state.bottom_user_query = ""
                 return
@@ -531,6 +558,20 @@ def main():
             faiss_index = department_manager.get_department_index(department)
             if faiss_index is None:
                 response = f"❌ No index found for {department} department. Please rebuild the index via admin."
+                
+                # Calculate response time for error
+                end_time = datetime.now()
+                response_time = (end_time - start_time).total_seconds()
+                
+                # Log the response
+                user_logger.log_bot_response(
+                    email=st.session_state.email,
+                    question=user_query,
+                    response=response,
+                    success=False,
+                    response_time=response_time
+                )
+                
                 st.session_state.query_history.append((user_query, response))
                 st.session_state.bottom_user_query = ""
                 return
@@ -542,10 +583,14 @@ def main():
                 
                 for question in questions:
                     if question.strip():
-                        response = query_processor.process_query(question.strip(), department, language_code=language_code)
-                        responses.append(response)
+                        try:
+                            response = query_processor.process_query(question.strip(), department, language_code=language_code)
+                            responses.append(response)
+                        except Exception as e:
+                            error_response = f"❌ Error processing question: {str(e)}"
+                            responses.append(error_response)
                 
-                response = " ".join(responses)
+                response = " ".join(responses) if responses else "❌ No response generated. Please try again."
                 
                 # Calculate response time
                 end_time = datetime.now()

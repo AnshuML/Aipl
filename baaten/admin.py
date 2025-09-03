@@ -54,7 +54,7 @@ if not api_key:
     st.error("OPENAI_API_KEY not set in environment or Streamlit secrets.")
     st.stop()
 
-openai.api_key = api_key
+# OpenAI API key is now handled by the OpenAI client in each function
 
 # Initialize DepartmentManager
 department_manager = DepartmentManager()

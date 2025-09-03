@@ -15,7 +15,7 @@ class QueryProcessor:
         # 1. Load department docs (chunks)
         docs = self.department_manager.get_department_docs(department)
         if not docs:
-            return "❌ No documents found for this department. Please upload via admin."
+            return f"❌ No documents found for {department} department. Please upload documents via admin panel first. You can access the admin panel to upload PDF documents for this department."
 
         # 2. BM25 retrieval
         bm25 = BM25Okapi([doc.lower().split() for doc in docs])
@@ -59,14 +59,16 @@ class QueryProcessor:
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = openai.ChatCompletion.create(
+                from openai import OpenAI
+                client = OpenAI()
+                response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
                         {"role": "system", "content": system_prompt.replace('{user_query}', query)},
                         {"role": "user", "content": query}
                     ]
                 )
-                answer = response['choices'][0]['message']['content']
+                answer = response.choices[0].message.content
                 break
             except Exception as e:
                 if attempt < max_retries - 1:

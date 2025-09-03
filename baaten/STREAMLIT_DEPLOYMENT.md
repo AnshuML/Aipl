@@ -57,6 +57,11 @@ gatherUsageStats = false
 - **Solution**: Added fallback translation service
 - **Result**: App works even without googletrans
 
+### ✅ OpenAI API Compatibility
+- **Problem**: Old OpenAI API format incompatible with openai>=1.0.0
+- **Solution**: Updated all API calls to use new client-based format
+- **Result**: Embeddings and chat completions work with latest OpenAI library
+
 ### ✅ Dependencies Updated
 - **Problem**: Outdated package versions
 - **Solution**: Updated `requirements.txt` with compatible versions

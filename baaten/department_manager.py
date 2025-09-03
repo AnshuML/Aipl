@@ -21,16 +21,18 @@ class DepartmentManager:
 
     def get_openai_embeddings(self, texts):
         import time
+        from openai import OpenAI
+        
         max_retries = 3
         
         for attempt in range(max_retries):
             try:
-                openai.api_key = self.openai_api_key
-                response = openai.Embedding.create(
+                client = OpenAI(api_key=self.openai_api_key)
+                response = client.embeddings.create(
                     input=texts,
                     model=self.embedding_model
                 )
-                return [d['embedding'] for d in response['data']]
+                return [d.embedding for d in response.data]
             except Exception as e:
                 if attempt < max_retries - 1:
                     print(f"Embedding generation attempt {attempt + 1} failed: {str(e)}. Retrying...")
