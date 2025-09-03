@@ -7,7 +7,7 @@ from datetime import datetime
 import pytz
 import random
 from typing import List, Tuple, Optional, Dict, Any
-from googletrans import Translator  # Updated for googletrans v2
+# Translation handled by TranslationService with fallback
 from rank_bm25 import BM25Okapi
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
