@@ -659,7 +659,18 @@ if department != "Select..." and uploaded_files:
     if st.button("Create Department Index"):
         with st.spinner("Generating embeddings and creating index..."):
             department_manager.create_department_index(department, documents)
-            st.success(f"Index created for {department} department! 🎉")
+            
+            # Update session state in main app if it exists
+            try:
+                import streamlit as st
+                # Clear the session state for this department to force reload
+                session_key = f"docs_{department.lower()}"
+                if session_key in st.session_state:
+                    del st.session_state[session_key]
+                st.success(f"Index created for {department} department! 🎉")
+                st.info("Please refresh the main app to see the updated documents.")
+            except:
+                st.success(f"Index created for {department} department! 🎉")
 else:
     st.warning("Please select a department and upload at least one PDF file.")
 
@@ -723,6 +734,7 @@ if st.button("Check Document Status"):
                 st.write(f"Index: {'✅' if index is not None else '❌'}")
                 
             if docs:
+                import glob
                 st.write(f"Document files found: {[os.path.basename(f) for f in glob.glob(os.path.join(department_manager.faiss_index_dir, 'docs', f'{dept.lower()}*.txt'))]}")
         except Exception as e:
             st.error(f"Error checking {dept}: {str(e)}")

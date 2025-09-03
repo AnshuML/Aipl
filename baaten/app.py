@@ -31,6 +31,26 @@ except ImportError:
 def get_department_manager():
     return DepartmentManager()
 
+# Store documents in session state for persistence
+def get_department_docs_from_session(department_name):
+    """Get department documents from session state or file system"""
+    session_key = f"docs_{department_name.lower()}"
+    
+    if session_key not in st.session_state:
+        # Load from file system
+        dept_manager = get_department_manager()
+        docs = dept_manager.get_department_docs(department_name)
+        st.session_state[session_key] = docs
+        print(f"Loaded {len(docs)} documents for {department_name} into session state")
+    
+    return st.session_state[session_key]
+
+def save_department_docs_to_session(department_name, docs):
+    """Save department documents to session state"""
+    session_key = f"docs_{department_name.lower()}"
+    st.session_state[session_key] = docs
+    print(f"Saved {len(docs)} documents for {department_name} to session state")
+
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -441,6 +461,16 @@ def main():
         # User info and logout
         st.markdown(f"<div style='background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); border: 1px solid rgba(16, 185, 129, 0.3);'><h3 style='margin:0; text-align:center; font-size: 1.2rem;'>👤 {st.session_state.user_name}</h3><p style='margin:5px 0 0 0; text-align:center; font-size: 0.9rem; opacity: 0.8;'>{st.session_state.email}</p></div>", unsafe_allow_html=True)
         
+        # Add refresh button for documents
+        if st.button("🔄 Refresh Documents", help="Click to reload documents from admin panel"):
+            # Clear all document session states
+            for dept in ["HR", "Accounts", "Sales", "IT", "Operations"]:
+                session_key = f"docs_{dept.lower()}"
+                if session_key in st.session_state:
+                    del st.session_state[session_key]
+            st.success("Documents refreshed! Please check the status below.")
+            st.rerun()
+        
         if st.button("🚪 Logout", key="logout_btn"):
             # Log logout
             user_logger.log_user_logout(st.session_state.email)
@@ -479,10 +509,9 @@ def main():
     if department == "Select...":
         st.markdown("""<div style='background: rgba(56, 189, 248, 0.1); color: #38bdf8; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #38bdf8; font-size: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'><strong>ℹ️ Info:</strong> Please select a department to ask a question.</div>""", unsafe_allow_html=True)
     else:
-        # Check if department has documents
+        # Check if department has documents using session state
         try:
-            department_manager = get_department_manager()
-            docs = department_manager.get_department_docs(department)
+            docs = get_department_docs_from_session(department)
             
             # Debug information
             st.markdown(f"""<div style='background: rgba(100, 100, 100, 0.1); color: #666; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 0.8rem;'><strong>Debug:</strong> Found {len(docs)} documents for {department} department</div>""", unsafe_allow_html=True)
@@ -545,8 +574,8 @@ def main():
             document_service = st.session_state.document_service
             query_processor = st.session_state.query_processor
             
-            # Check if department documents exist
-            docs = department_manager.get_department_docs(department)
+            # Check if department documents exist using session state
+            docs = get_department_docs_from_session(department)
             if not docs:
                 response = f"❌ No documents found for {department} department. Please upload documents via admin."
                 
