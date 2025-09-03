@@ -7,7 +7,14 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from utils.user_logger import user_logger
+try:
+    from utils.user_logger import user_logger
+except ImportError:
+    # Fallback for when utils module is not available
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from utils.user_logger import user_logger
 load_dotenv()
 
 st.set_page_config(page_title="Admin - Department Data Upload", layout="wide")
@@ -694,3 +701,40 @@ if st.session_state.get("show_confirm", False):
 
 with tab2:
     show_logs_dashboard()
+
+# Add a debug section to check document status
+st.markdown("---")
+st.subheader("🔍 Document Status Check")
+
+if st.button("Check Document Status"):
+    st.write("Checking document status for all departments...")
+    
+    for dept in ["HR", "Accounts", "Sales", "IT", "Operations"]:
+        try:
+            docs = department_manager.get_department_docs(dept)
+            index = department_manager.get_department_index(dept)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.write(f"**{dept} Department**")
+            with col2:
+                st.write(f"Documents: {len(docs)}")
+            with col3:
+                st.write(f"Index: {'✅' if index is not None else '❌'}")
+                
+            if docs:
+                st.write(f"Document files found: {[os.path.basename(f) for f in glob.glob(os.path.join(department_manager.faiss_index_dir, 'docs', f'{dept.lower()}*.txt'))]}")
+        except Exception as e:
+            st.error(f"Error checking {dept}: {str(e)}")
+    
+    st.write("---")
+    st.write("**File System Debug:**")
+    st.write(f"Base directory: {department_manager.base_dir}")
+    st.write(f"FAISS index directory: {department_manager.faiss_index_dir}")
+    
+    docs_dir = os.path.join(department_manager.faiss_index_dir, "docs")
+    if os.path.exists(docs_dir):
+        st.write(f"Docs directory exists: {docs_dir}")
+        st.write(f"Files in docs directory: {os.listdir(docs_dir)}")
+    else:
+        st.write(f"Docs directory does not exist: {docs_dir}")

@@ -77,23 +77,53 @@ class DepartmentManager:
 
     def get_department_docs(self, department_name):
         docs_dir = os.path.join(self.faiss_index_dir, "docs")
-        pattern = os.path.join(docs_dir, f"{department_name.lower()}_*.txt")
-        files = glob.glob(pattern)
         
-        # If no specific department files found, check for a single department file
-        if not files:
-            single_file = os.path.join(docs_dir, f"{department_name.lower()}.txt")
-            if os.path.exists(single_file):
-                files = [single_file]
+        # Debug: Print the directory we're looking in
+        print(f"Looking for documents in: {docs_dir}")
+        print(f"Department: {department_name}")
+        
+        # Check if docs directory exists
+        if not os.path.exists(docs_dir):
+            print(f"Docs directory does not exist: {docs_dir}")
+            return []
+        
+        # List all files in docs directory for debugging
+        all_files = os.listdir(docs_dir)
+        print(f"All files in docs directory: {all_files}")
+        
+        # Try multiple patterns to find department files
+        patterns = [
+            f"{department_name.lower()}_*.txt",  # hr_*.txt
+            f"{department_name.lower()}*.txt",   # hr*.txt
+            f"{department_name.lower()}.txt",    # hr.txt
+            f"{department_name.upper()}_*.txt",  # HR_*.txt
+            f"{department_name.upper()}*.txt",   # HR*.txt
+            f"{department_name.upper()}.txt"     # HR.txt
+        ]
+        
+        files = []
+        for pattern in patterns:
+            pattern_path = os.path.join(docs_dir, pattern)
+            found_files = glob.glob(pattern_path)
+            if found_files:
+                files.extend(found_files)
+                print(f"Found files with pattern {pattern}: {found_files}")
+        
+        # Remove duplicates
+        files = list(set(files))
         
         docs = []
         for file in files:
             try:
                 with open(file, "r", encoding="utf-8") as f:
-                    docs.append(f.read())
+                    content = f.read().strip()
+                    if content:  # Only add non-empty content
+                        docs.append(content)
+                        print(f"Successfully loaded document: {os.path.basename(file)}")
             except Exception as e:
                 print(f"Error reading file {file}: {str(e)}")
         
+        print(f"Total documents loaded for {department_name}: {len(docs)}")
         return docs
 
     def get_department_index(self, department_name):

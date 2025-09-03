@@ -17,7 +17,14 @@ import openai
 # Local imports
 from config import config
 from department_manager import DepartmentManager
-from utils.user_logger import user_logger
+try:
+    from utils.user_logger import user_logger
+except ImportError:
+    # Fallback for when utils module is not available
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from utils.user_logger import user_logger
 
 # Cache department manager globally to prevent recreation
 @st.cache_resource
@@ -476,12 +483,18 @@ def main():
         try:
             department_manager = get_department_manager()
             docs = department_manager.get_department_docs(department)
+            
+            # Debug information
+            st.markdown(f"""<div style='background: rgba(100, 100, 100, 0.1); color: #666; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 0.8rem;'><strong>Debug:</strong> Found {len(docs)} documents for {department} department</div>""", unsafe_allow_html=True)
+            
             if not docs:
                 st.markdown(f"""<div style='background: rgba(251, 191, 36, 0.1); color: #fbbf24; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #fbbf24; font-size: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'><strong>⚠️ Notice:</strong> No documents found for {department} department. Please upload documents via admin panel first.</div>""", unsafe_allow_html=True)
                 placeholder = f"Ask a question from {department} (no documents uploaded yet)..."
             else:
+                st.markdown(f"""<div style='background: rgba(34, 197, 94, 0.1); color: #22c55e; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #22c55e; font-size: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'><strong>✅ Ready:</strong> {len(docs)} documents loaded for {department} department. You can ask questions now!</div>""", unsafe_allow_html=True)
                 placeholder = f"Ask a question from {department}..."
-        except:
+        except Exception as e:
+            st.markdown(f"""<div style='background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #ef4444; font-size: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'><strong>❌ Error:</strong> Could not check documents for {department} department. Error: {str(e)}</div>""", unsafe_allow_html=True)
             placeholder = f"Ask a question from {department}..."
 
     # Display chat history before the input box
