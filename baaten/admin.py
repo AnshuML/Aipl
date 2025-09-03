@@ -7,14 +7,29 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+# Import user_logger with better error handling
 try:
     from utils.user_logger import user_logger
-except ImportError:
+except (ImportError, KeyError, ModuleNotFoundError) as e:
     # Fallback for when utils module is not available
     import sys
     import os
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    from utils.user_logger import user_logger
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    utils_path = os.path.join(current_dir, 'utils')
+    if utils_path not in sys.path:
+        sys.path.insert(0, utils_path)
+    try:
+        from user_logger import user_logger
+    except ImportError:
+        # Create a dummy logger if all else fails
+        class DummyLogger:
+            def log_user_login(self, *args, **kwargs): pass
+            def log_user_question(self, *args, **kwargs): pass
+            def log_bot_response(self, *args, **kwargs): pass
+            def log_user_logout(self, *args, **kwargs): pass
+            def log_error(self, *args, **kwargs): pass
+        user_logger = DummyLogger()
+        print(f"Warning: Using dummy logger due to import error: {e}")
 load_dotenv()
 
 st.set_page_config(page_title="Admin - Department Data Upload", layout="wide")

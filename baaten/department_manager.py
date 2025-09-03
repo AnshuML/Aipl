@@ -79,6 +79,15 @@ class DepartmentManager:
         index_path = os.path.join(self.faiss_index_dir, f"{department_name.lower()}.index")
         faiss.write_index(index, index_path)
         self.departments[department_name] = index_path
+        
+        # Store documents in memory for immediate access
+        if not hasattr(self, 'department_documents'):
+            self.department_documents = {}
+        self.department_documents[department_name] = documents
+        
+        print(f"Created index for {department_name} with {len(documents)} documents")
+        print(f"Index saved to: {index_path}")
+        
         # Save docs for BM25/hybrid retrieval (now handled per-PDF)
         # os.makedirs("faiss_index/docs", exist_ok=True)
         # with open(f"faiss_index/docs/{department_name.lower()}.txt", "w", encoding="utf-8") as f:
@@ -86,6 +95,13 @@ class DepartmentManager:
         #         f.write(doc.replace("\n", " ").strip() + "\n")
 
     def get_department_docs(self, department_name):
+        # First check if documents are stored in memory
+        if hasattr(self, 'department_documents') and department_name in self.department_documents:
+            docs = self.department_documents[department_name]
+            print(f"Found {len(docs)} documents for {department_name} in memory")
+            return docs
+        
+        # If not in memory, try to load from file system
         docs_dir = os.path.join(self.faiss_index_dir, "docs")
         
         # Debug: Print the directory we're looking in
@@ -150,6 +166,11 @@ class DepartmentManager:
                         print(f"Successfully loaded document: {os.path.basename(file)}")
             except Exception as e:
                 print(f"Error reading file {file}: {str(e)}")
+        
+        # Store in memory for future access
+        if not hasattr(self, 'department_documents'):
+            self.department_documents = {}
+        self.department_documents[department_name] = docs
         
         print(f"Total documents loaded for {department_name}: {len(docs)}")
         return docs
