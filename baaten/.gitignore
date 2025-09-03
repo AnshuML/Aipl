@@ -1,7 +1,34 @@
-ajit/
+# Python
 __pycache__/
 *.pyc
-baaten/app.log
-baaten/uploads/**
-baaten/faiss_index/**
+*.pyo
+*.pyd
 .env
+.env.*
+.venv/
+venv/
+ENV/
+
+# Logs and user data
+*.log
+user_logs/
+user_logs_backup_*/
+
+# Streamlit
+.streamlit/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project runtime data
+uploads/**
+faiss_index/**
+
+# Local Python runtime bundle
+ajit/
+
+# Sensitive files
+*.key
+*.pem
+secrets.json

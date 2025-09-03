@@ -20,12 +20,23 @@ class DepartmentManager:
         self._initialize_departments()
 
     def get_openai_embeddings(self, texts):
-        openai.api_key = self.openai_api_key
-        response = openai.Embedding.create(
-            input=texts,
-            model=self.embedding_model
-        )
-        return [d['embedding'] for d in response['data']]
+        import time
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                openai.api_key = self.openai_api_key
+                response = openai.Embedding.create(
+                    input=texts,
+                    model=self.embedding_model
+                )
+                return [d['embedding'] for d in response['data']]
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"Embedding generation attempt {attempt + 1} failed: {str(e)}. Retrying...")
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    raise Exception(f"Failed to generate embeddings after {max_retries} attempts: {str(e)}")
 
     def _get_openai_api_key(self) -> str:
         key = os.getenv("OPENAI_API_KEY")
@@ -38,7 +49,13 @@ class DepartmentManager:
         if not key:
             raise ValueError("OPENAI_API_KEY not set in environment or Streamlit secrets.")
         if isinstance(key, str):
-            key = key.strip().strip('"').strip("'")
+            # Remove quotes and whitespace
+            key = key.strip()
+            if key.startswith('"') and key.endswith('"'):
+                key = key[1:-1]
+            elif key.startswith("'") and key.endswith("'"):
+                key = key[1:-1]
+            key = key.strip()
         return key
 
     def create_department_index(self, department_name, documents):
@@ -99,11 +116,34 @@ class DepartmentManager:
 
     # --- New methods for per-PDF management ---
     def save_department_pdf(self, department_name, pdf_filename, text):
+        # Sanitize department name and filename to prevent path traversal
+        safe_dept_name = self._sanitize_name(department_name)
+        safe_filename = self._sanitize_name(pdf_filename)
+        
         docs_dir = os.path.join(self.faiss_index_dir, "docs")
         os.makedirs(docs_dir, exist_ok=True)
-        path = os.path.join(docs_dir, f"{department_name.lower()}_{pdf_filename}.txt")
+        path = os.path.join(docs_dir, f"{safe_dept_name}_{safe_filename}.txt")
+        
+        # Ensure the path is within the docs directory
+        if not os.path.abspath(path).startswith(os.path.abspath(docs_dir)):
+            raise ValueError("Invalid path: potential path traversal detected")
+            
         with open(path, "w", encoding="utf-8") as f:
             f.write(text.strip())
+    
+    def _sanitize_name(self, name):
+        """Sanitize department name or filename to prevent path traversal"""
+        import re
+        # Remove path traversal attempts
+        name = re.sub(r'[\.]{2,}', '', name)
+        # Remove dangerous characters
+        name = re.sub(r'[<>:"/\\|?*]', '_', name)
+        # Remove leading/trailing dots and spaces
+        name = name.strip('. ')
+        # Ensure it's not empty
+        if not name:
+            name = "default"
+        return name.lower()
 
     def list_department_pdfs(self, department_name):
         docs_dir = os.path.join(self.faiss_index_dir, "docs")

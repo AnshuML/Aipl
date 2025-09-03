@@ -100,9 +100,16 @@ class InputValidator:
             raise ValidationError(f"File size exceeds {max_size_mb}MB limit")
         
         # Check file type
+        if not file.name or file.name.strip() == '':
+            raise ValidationError("File name cannot be empty")
+        
         file_extension = file.name.split('.')[-1].lower() if '.' in file.name else ''
         if file_extension not in allowed_types:
             raise ValidationError(f"File type '{file_extension}' not allowed. Allowed types: {allowed_types}")
+        
+        # Check for valid filename (not just extension)
+        if file.name == f".{file_extension}" or file.name.startswith('.'):
+            raise ValidationError("Invalid file name")
         
         return True
     
@@ -129,6 +136,30 @@ class InputValidator:
         
         if len(query) > max_length:
             raise ValidationError(f"Query too long. Maximum {max_length} characters allowed")
+        
+        return True
+    
+    @staticmethod
+    def sanitize_filename(filename: str) -> str:
+        """Sanitize filename to prevent path traversal"""
+        import re
+        # Remove path traversal attempts
+        filename = re.sub(r'[\.]{2,}', '', filename)
+        # Remove dangerous characters
+        filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+        # Remove leading/trailing dots and spaces
+        filename = filename.strip('. ')
+        return filename
+    
+    @staticmethod
+    def validate_email_domain(email: str, allowed_domains: list) -> bool:
+        """Validate email domain"""
+        if not email or '@' not in email:
+            raise ValidationError("Invalid email format")
+        
+        domain = email.split('@')[1]
+        if domain not in allowed_domains:
+            raise ValidationError(f"Email domain '{domain}' not allowed")
         
         return True
 

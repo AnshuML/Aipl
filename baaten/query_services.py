@@ -3,6 +3,8 @@ import re
 import numpy as np
 from rank_bm25 import BM25Okapi
 from services.translation_service import TranslationService
+import requests
+import time
 
 class QueryProcessor:
     def __init__(self, department_manager):
@@ -22,14 +24,19 @@ class QueryProcessor:
         bm25_top_idx = np.argsort(bm25_scores)[::-1][:top_k]
         bm25_chunks = [docs[i] for i in bm25_top_idx]
 
-        # 3. Embedding (FAISS) retrieval
+        # 3. Embedding (FAISS) retrieval with error handling
         faiss_index = self.department_manager.get_department_index(department)
+        faiss_chunks = []
         if faiss_index is not None:
-            emb = self.department_manager.get_openai_embeddings([query])[0] if hasattr(self.department_manager, 'get_openai_embeddings') else self.department_manager.get_embeddings([query])[0]
-            D, I = faiss_index.search(np.array([emb]).astype('float32'), top_k)
-            faiss_chunks = [docs[i] for i in I[0]]
-        else:
-            faiss_chunks = []
+            try:
+                emb = self.department_manager.get_openai_embeddings([query])[0] if hasattr(self.department_manager, 'get_openai_embeddings') else self.department_manager.get_embeddings([query])[0]
+                D, I = faiss_index.search(np.array([emb]).astype('float32'), top_k)
+                # Filter indices to ensure they're within bounds
+                valid_indices = [i for i in I[0] if 0 <= i < len(docs)]
+                faiss_chunks = [docs[i] for i in valid_indices]
+            except Exception as e:
+                print(f"Warning: FAISS embedding search failed: {str(e)}. Using BM25 results only.")
+                faiss_chunks = []
 
         # 4. Merge (deduplicate, preserve order)
         hybrid_chunks = []
@@ -47,14 +54,28 @@ class QueryProcessor:
             f"Relevant content:\n{hybrid_context}\n\n"
             "User question: {user_query}\n"
         )
-        response = openai.ChatCompletion.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": system_prompt.replace('{user_query}', query)},
-                {"role": "user", "content": query}
-            ]
-        )
-        answer = response['choices'][0]['message']['content']
+        
+        # Try OpenAI API with retry mechanism
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt.replace('{user_query}', query)},
+                        {"role": "user", "content": query}
+                    ]
+                )
+                answer = response['choices'][0]['message']['content']
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"OpenAI API attempt {attempt + 1} failed: {str(e)}. Retrying...")
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    # Fallback response when OpenAI is unavailable
+                    answer = f"❌ Error: Unable to connect to AI service. Please check your internet connection and try again. Error details: {str(e)}"
+                    break
 
         # 6. Translate answer if needed
         if language_code and language_code != 'en':

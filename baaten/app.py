@@ -17,6 +17,12 @@ import openai
 # Local imports
 from config import config
 from department_manager import DepartmentManager
+from utils.user_logger import user_logger
+
+# Cache department manager globally to prevent recreation
+@st.cache_resource
+def get_department_manager():
+    return DepartmentManager()
 
 import smtplib
 from email.mime.text import MIMEText
@@ -189,17 +195,55 @@ def get_greeting():
     else:
         return "Good evening!"
 
-# --- Custom CSS for Language Select ---
+# --- Custom CSS for Dark Theme Only ---
 st.markdown(
     """
     <style>
+    /* Force dark theme globally */
+    .stApp {
+        color-scheme: dark !important;
+        background: linear-gradient(135deg, #1e1e2f, #0f2027) !important;
+    }
+    
     body {
         background: linear-gradient(135deg, #1e1e2f, #0f2027) !important;
         color: #ffffff !important;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
     }
+    
     .main .block-container {
         background: transparent !important;
+    }
+    
+    /* Override Streamlit's theme detection */
+    [data-testid="stAppViewContainer"] {
+        background: linear-gradient(135deg, #1e1e2f, #0f2027) !important;
+    }
+    
+    /* Force dark theme for all components */
+    .stSelectbox > div > div {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+    }
+    
+    .stTextInput > div > div > input {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+    }
+    
+    /* Force white text for all content */
+    .stMarkdown, .stMarkdown p, .stMarkdown div {
+        color: #ffffff !important;
+    }
+    
+    /* Chat history text in white */
+    .query-text, .answer-text {
+        color: #ffffff !important;
+    }
+    
+    /* All text elements in white */
+    p, div, span, h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
     }
     div[data-testid="stSelectbox"] > label {
         background-color: #34495e !important;
@@ -274,7 +318,56 @@ st.markdown(
 )
 
 def main():
-    st.set_page_config(page_title="AIPL Mind", layout="centered")
+    st.set_page_config(
+        page_title="AIPL Mind", 
+        layout="centered",
+        initial_sidebar_state="expanded"
+    )
+    
+    # Force dark theme and hide theme menu
+    st.markdown("""
+    <style>
+    .stApp {
+        color-scheme: dark !important;
+    }
+    .stApp > header {
+        background-color: transparent;
+    }
+    .stApp > div {
+        background-color: #0f172a;
+    }
+    
+    /* Hide Streamlit's theme menu */
+    .stApp > div[data-testid="stToolbar"] {
+        display: none !important;
+    }
+    
+    /* Hide hamburger menu that contains theme options */
+    .stApp > div[data-testid="stHeader"] {
+        display: none !important;
+    }
+    
+    /* Force dark theme on all elements */
+    * {
+        color-scheme: dark !important;
+    }
+    
+    /* Ensure all Streamlit text is white */
+    .stMarkdown, .stMarkdown p, .stMarkdown div, .stMarkdown span {
+        color: #ffffff !important;
+    }
+    
+    /* Streamlit content areas */
+    .main .block-container {
+        color: #ffffff !important;
+    }
+    
+    /* All text in main content */
+    .main .block-container p, .main .block-container div, .main .block-container span {
+        color: #ffffff !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     # Initialize session state
     if 'logged_in' not in st.session_state:
@@ -291,24 +384,61 @@ def main():
         st.session_state.logged_in = False
     if 'email' not in st.session_state:
         st.session_state.email = ""
+    if 'user_name' not in st.session_state:
+        st.session_state.user_name = ""
 
     # User login with email domain check
     if not st.session_state.logged_in:
         st.title("🔐 Login to AIPL Chatbot")
-        email = st.text_input("Enter your company email", value=st.session_state.email)
-        password = st.text_input("Enter password", type="password")
-        if st.button("Login"):
-            # Allow both aiplabro.com and ajitindustries.com company emails
-            if re.match(r"^[\w\.-]+@(aiplabro\.com|ajitindustries\.com)$", email) and password == "password":
-                st.session_state.logged_in = True
-                st.session_state.email = email
-                st.success("Logged in successfully!")
-                st.rerun()
-            else:
-                st.error("Invalid email or password.")
+        
+        # Create a form for login
+        with st.form("login_form"):
+            st.markdown("### 👤 User Information")
+            user_name = st.text_input("Enter your full name", placeholder="e.g., John Doe")
+            email = st.text_input("Enter your company email", placeholder="e.g., john.doe@aiplabro.com")
+            password = st.text_input("Enter password", type="password")
+            
+            submitted = st.form_submit_button("🔑 Login", use_container_width=True)
+            
+            if submitted:
+                # Validate inputs
+                if not user_name.strip():
+                    st.error("Please enter your full name.")
+                elif not email.strip():
+                    st.error("Please enter your email address.")
+                elif not password.strip():
+                    st.error("Please enter your password.")
+                else:
+                    # Allow only company emails
+                    if re.match(r"^[\w\.-]+@(aiplabro\.com|ajitindustries\.com)$", email) and password == "password":
+                        st.session_state.logged_in = True
+                        st.session_state.email = email
+                        st.session_state.user_name = user_name.strip()
+                        st.session_state.login_time = datetime.now().isoformat()
+                        
+                        # Log successful login
+                        user_logger.log_user_login(email, True, user_name.strip())
+                        
+                        st.success(f"Welcome {user_name}! Logged in successfully!")
+                        st.rerun()
+                    else:
+                        # Log failed login attempt
+                        user_logger.log_user_login(email, False, "")
+                        st.error("Invalid email or password. Only @aiplabro.com and @ajitindustries.com emails allowed.")
         return
 
     with st.sidebar:
+        # User info and logout
+        st.markdown(f"<div style='background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); border: 1px solid rgba(16, 185, 129, 0.3);'><h3 style='margin:0; text-align:center; font-size: 1.2rem;'>👤 {st.session_state.user_name}</h3><p style='margin:5px 0 0 0; text-align:center; font-size: 0.9rem; opacity: 0.8;'>{st.session_state.email}</p></div>", unsafe_allow_html=True)
+        
+        if st.button("🚪 Logout", key="logout_btn"):
+            # Log logout
+            user_logger.log_user_logout(st.session_state.email)
+            # Clear session
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
+        
         st.markdown("<div style='background: linear-gradient(135deg, #0369a1, #0ea5e9); color: white; padding: 18px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); border: 1px solid rgba(14, 165, 233, 0.3);'><h2 style='margin:0; text-align:center; font-size: 1.5rem; letter-spacing: 1px; font-weight: 600;'>🌐 Select Response Language</h2></div>", unsafe_allow_html=True)
         language_options = config.LANGUAGE_OPTIONS
         language = st.selectbox("Language", list(language_options.keys()))
@@ -351,8 +481,8 @@ def main():
         for q, r in st.session_state.query_history:
             st.markdown(f"""
             <div style='background: rgba(30, 41, 59, 0.4); padding: 20px; border-radius: 12px; margin: 16px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid rgba(59, 130, 246, 0.2);'>
-                <div class='query-text' style='margin-bottom: 14px; color: #f1f5f9; font-size: 16px;'><strong style='color: #60a5fa;'>You:</strong> {q}</div>
-                <div class='answer-text' style='color: #f8fafc; font-size: 16px; line-height: 1.6;'><strong style='color: #38bdf8;'>AIPL Bot:</strong> {r}</div>
+                <div class='query-text' style='margin-bottom: 14px; color: #ffffff; font-size: 16px;'><strong style='color: #60a5fa;'>You:</strong> {q}</div>
+                <div class='answer-text' style='color: #ffffff; font-size: 16px; line-height: 1.6;'><strong style='color: #38bdf8;'>AIPL Bot:</strong> {r}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -366,12 +496,28 @@ def main():
         if not user_query:
             return
         
-        # Existing logic for processing the query
-        department_manager = DepartmentManager()
-        document_service = DocumentService(department_manager)
-        query_processor = QueryProcessor(department_manager)
+        # Log user question
+        user_logger.log_user_question(
+            email=st.session_state.email,
+            question=user_query,
+            department=department,
+            language=language
+        )
+        
+        start_time = datetime.now()
+        
         try:
-            # Debug information removed
+            # Use cached department manager
+            department_manager = get_department_manager()
+            
+            # Initialize services with cached manager
+            if 'document_service' not in st.session_state:
+                st.session_state.document_service = DocumentService(department_manager)
+            if 'query_processor' not in st.session_state:
+                st.session_state.query_processor = QueryProcessor(department_manager)
+            
+            document_service = st.session_state.document_service
+            query_processor = st.session_state.query_processor
             
             # Check if department documents exist
             docs = department_manager.get_department_docs(department)
@@ -390,28 +536,73 @@ def main():
                 return
             
             # Process the query
-            questions = re.split(r'[?.!]', user_query)
-            responses = []
-            for question in questions:
-                if question.strip():
-                    response = query_processor.process_query(question.strip(), department, language_code=language_code)
-                    responses.append(response)
-            response = " ".join(responses)
+            with st.spinner("🤖 Generating response..."):
+                questions = re.split(r'[?.!]', user_query)
+                responses = []
+                
+                for question in questions:
+                    if question.strip():
+                        response = query_processor.process_query(question.strip(), department, language_code=language_code)
+                        responses.append(response)
+                
+                response = " ".join(responses)
+                
+                # Calculate response time
+                end_time = datetime.now()
+                response_time = (end_time - start_time).total_seconds()
+                
+                # Log successful response
+                user_logger.log_bot_response(
+                    email=st.session_state.email,
+                    question=user_query,
+                    response=response,
+                    success=True,
+                    response_time=response_time
+                )
+                
         except Exception as e:
             response = f"\u274C Error: {str(e)}"
             import traceback
             st.error(traceback.format_exc())
+            
+            # Calculate response time for error
+            end_time = datetime.now()
+            response_time = (end_time - start_time).total_seconds()
+            
+            # Log error
+            user_logger.log_error(
+                email=st.session_state.email,
+                error_type="Query Processing Error",
+                error_message=str(e)
+            )
+            
+            # Log failed response
+            user_logger.log_bot_response(
+                email=st.session_state.email,
+                question=user_query,
+                response=response,
+                success=False,
+                response_time=response_time
+            )
         
         # Add to history
         st.session_state.query_history.append((user_query, response))
-        # Clear the input by setting an empty string in session state
+        # Clear the query state
         st.session_state.bottom_user_query = ""
+        # Force UI refresh
+        st.rerun()
     
     # Fixed input box at the bottom with improved styling
     st.markdown("<div class='chat-input-container'>", unsafe_allow_html=True)
-    st.text_input(placeholder, key="bottom_user_query", disabled=(department == "Select..."))
-    if st.button("Submit", disabled=(department == "Select..."), on_click=process_query):
-        pass
+    
+    # Use form with clear_on_submit for automatic input clearing
+    with st.form(key="query_form", clear_on_submit=True):
+        user_input = st.text_input(placeholder, disabled=(department == "Select..."))
+        submit_button = st.form_submit_button("Submit", disabled=(department == "Select..."))
+        
+        if submit_button and user_input:
+            st.session_state.bottom_user_query = user_input
+            process_query()
     
     # Auto-scroll to the bottom
     st.markdown("<script>window.scrollTo(0, document.body.scrollHeight);</script>", unsafe_allow_html=True)

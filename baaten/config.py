@@ -34,6 +34,8 @@ class DirectoryConfig:
 class AppConfig:
     """Main application configuration"""
     
+    _instance = None
+    
     DEPARTMENTS: List[str] = [
         "HR", "Accounts", "Sales", "Marketing", 
         "IT", "Operations", "Customer Support"
@@ -64,26 +66,43 @@ class AppConfig:
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin123"
     
+    def __new__(cls):
+        """Singleton pattern implementation"""
+        if cls._instance is None:
+            cls._instance = super(AppConfig, cls).__new__(cls)
+        return cls._instance
+    
     def __init__(self):
-        self.model = ModelConfig()
-        self.ui = UIConfig()
-        self.directories = DirectoryConfig()
-        
-        # Load from environment if available
-        self._load_from_env()
+        # Only initialize once
+        if not hasattr(self, '_initialized'):
+            self.model = ModelConfig()
+            self.ui = UIConfig()
+            self.directories = DirectoryConfig()
+            
+            # Load from environment if available
+            self._load_from_env()
+            self._initialized = True
     
     def _load_from_env(self):
         """Load configuration from environment variables"""
         self.model.llm_model = os.getenv("LLM_MODEL", self.model.llm_model)
-        self.model.temperature = float(os.getenv("LLM_TEMPERATURE", self.model.temperature))
+        
+        # Handle temperature with validation
+        temp_str = os.getenv("LLM_TEMPERATURE")
+        if temp_str is not None:
+            try:
+                self.model.temperature = float(temp_str)
+            except ValueError:
+                raise ValueError(f"Invalid temperature value: {temp_str}")
+        else:
+            self.model.temperature = self.model.temperature
+            
         self.ui.page_title = os.getenv("APP_TITLE", self.ui.page_title)
     
     @classmethod
     def get_instance(cls):
         """Singleton pattern for configuration"""
-        if not hasattr(cls, '_instance'):
-            cls._instance = cls()
-        return cls._instance
+        return cls()
 
 
 # Global configuration instance
